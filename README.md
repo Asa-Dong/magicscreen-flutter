@@ -1,5 +1,11 @@
-# 
-
+# windows环境
+```
+报错 启用开发者模式
+Please enable Developer Mode in your system settings. Run
+start ms-settings:developers
+// 开启开发者权限  （管理员执行）
+reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
+```
 
 
 ## 人脸检测

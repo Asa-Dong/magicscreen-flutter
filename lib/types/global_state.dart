@@ -47,11 +47,16 @@ class GlobalState {
     final len = imgUrls.length;
     for (int i = 0; i < len; i++) {
       final url = imgUrls[i];
+
+      final fileName = url.split('/').last.split('?').first;
+      final file = File("${dir.path}/$fileName");
+      if(file.existsSync()) {
+        callback("${i + 1}/$len");
+        continue;
+      }
+
       final response = await http.get(Uri.parse(url));
       final bytes = response.bodyBytes;
-      final fileName = url.split('/').last.split('?').first;
-
-      final file = File("${dir.path}/$fileName");
       await file.writeAsBytes(bytes);
 
       callback("${i + 1}/$len");

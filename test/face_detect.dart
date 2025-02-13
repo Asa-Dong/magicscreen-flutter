@@ -33,7 +33,7 @@ class _FaceDetectionState extends State<FaceDetection> {
     var beginAt = DateTime.now();
     for (int i = 0; i < 20; i++) {
       List<DetectBox>? boxes =
-      _faceDetectionCv2.detectFaces('assets/images/face-2.png');
+      _faceDetectionCv2.detectFromFile('assets/images/face-2.png');
     }
     print('_faceDetectionCv2: ${DateTime.now().difference(beginAt).inMilliseconds} ms');
   }

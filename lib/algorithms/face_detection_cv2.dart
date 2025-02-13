@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:magicscreen/algorithms/types/face_detect_box.dart';
+import 'package:magicscreen/algorithms/types/detect_box.dart';
 import 'package:opencv_core/opencv.dart' as cv2;
 
 // cv2 + yunet model
@@ -65,15 +65,19 @@ class FaceDetectionCv2 {
     return resizedImage;
   }
 
-  List<DetectBox>? detectFaces(String imagePath) {
+  List<DetectBox>? detectFromFile(String imagePath, {int topK = 1}) {
     var img = cv2.imread(imagePath, flags: cv2.IMREAD_COLOR);
+    return detect(img, topK: topK);
+  }
+
+  List<DetectBox>? detect(cv2.Mat img, {int topK = 1}) {
     _faceDetector.setInputSize((img.width, img.height));
     final faces = _faceDetector.detect(img);
     if (faces.isEmpty) {
       return null;
     }
 
-    return List.generate(faces.rows, (i) {
+    return List.generate(min(topK, faces.rows), (i) {
       final x = faces.at<double>(i, 0).toInt();
       final y = faces.at<double>(i, 1).toInt();
       final width = faces.at<double>(i, 2).toInt();
@@ -89,7 +93,13 @@ class FaceDetectionCv2 {
         y,
         x + width,
         y + height,
+        img.width,
+        img.height,
       );
     });
+  }
+
+  void dispose() {
+    _faceDetector.dispose();
   }
 }

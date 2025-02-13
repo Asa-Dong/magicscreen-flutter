@@ -3,7 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
-import 'package:magicscreen/algorithms/types/face_detect_box.dart';
+import 'package:magicscreen/algorithms/types/detect_box.dart';
 import 'package:onnxruntime/onnxruntime.dart';
 
 // onnx + ultraface model
@@ -16,8 +16,8 @@ class FaceDetectionOnnx {
   // = 'assets/models/version-RFB-320.onnx'
   FaceDetectionOnnx(String modelPath) {
     _runOptions = OrtRunOptions();
-    _runOptions.setRunLogSeverityLevel(1);
-    _runOptions.setRunLogVerbosityLevel(1);
+    _runOptions.setRunLogSeverityLevel(OrtLoggingLevel.warning.value);
+    _runOptions.setRunLogVerbosityLevel(OrtLoggingLevel.warning.value);
     _loadModel(modelPath);
   }
 
@@ -42,12 +42,12 @@ class FaceDetectionOnnx {
   }
 
   // 'assets/images/face-1.png'
-  Future<DetectBox?> detectFaceFile(String path) async {
+  Future<List<DetectBox>?> detectFile(String path) async {
     final image = await _loadImage(path);
-    return detectFace(image);
+    return detect(image);
   }
 
-  DetectBox? detectFace(img.Image image) {
+  List<DetectBox>? detect(img.Image image, {int topK = 1}) {
     final resizedImage = img.copyResize(image,
         width: 320, // model input size
         height: 240, // model input size
@@ -85,9 +85,10 @@ class FaceDetectionOnnx {
 
     var boxTopOne = [-1.0, -1.0, -1.0, -1.0, -1.0]; // score, x1,y1,x2,y2
 
-    // 过滤出置信度大于0.7的框
+    final List<DetectBox> detectBoxes = [];
+
     for (int i = 0; i < scores.length; i++) {
-      if (scores[i][1] > 0.7 && scores[i][1] > boxTopOne[0]) {
+      if (scores[i][1] > 0.7) {
         boxTopOne = [
           scores[i][1],
           boxes[i][0],
@@ -95,48 +96,44 @@ class FaceDetectionOnnx {
           boxes[i][2],
           boxes[i][3]
         ];
+
+        // 计算实际的x1,y1,x2,y2
+        final resizeW = resizedImage.width;
+        final resizeH = resizedImage.height;
+
+        final w = image.width;
+        final h = image.height;
+
+        final scaleRatio = max(w / resizeW, h / resizeH);
+
+        //  缩放后的尺寸
+        var newWidth = (resizeW * scaleRatio).ceil();
+        var newHeight = (resizeH * scaleRatio).ceil();
+
+        // 填充的尺寸
+        var deltaW = newWidth - w;
+        var deltaH = newHeight - h;
+        var top = (deltaH / 2).ceil();
+        var left = (deltaW / 2).ceil();
+
+        final box = DetectBox(
+          boxTopOne[0],
+          (boxTopOne[1] * newWidth - left).ceil(),
+          (boxTopOne[2] * newHeight - top).ceil(),
+          (boxTopOne[3] * newWidth - left).ceil(),
+          (boxTopOne[4] * newHeight - top).ceil(),
+          image.width,
+          image.height,
+        );
+        detectBoxes.add(box);
       }
     }
+    return detectBoxes.isEmpty ? null : detectBoxes.take(topK).toList();
+  }
 
-    if (boxTopOne[0] > 0.0) {
-      // 计算实际的x1,y1,x2,y2
-      final resizeW = resizedImage.width;
-      final resizeH = resizedImage.height;
-
-      final w = image.width;
-      final h = image.height;
-
-      final scaleRatio = max(w / resizeW, h / resizeH);
-
-      //  计算缩放后的尺寸
-      var newWidth = (resizeW * scaleRatio).ceil();
-      var newHeight = (resizeH * scaleRatio).ceil();
-
-      // 计算填充的尺寸
-      var deltaW = newWidth - w;
-      var deltaH = newHeight - h;
-      var top = (deltaH / 2).ceil();
-      var left = (deltaW / 2).ceil();
-
-      final box = DetectBox(
-        boxTopOne[0],
-        (boxTopOne[1] * newWidth - left).ceil(),
-        (boxTopOne[2] * newHeight - top).ceil(),
-        (boxTopOne[3] * newWidth - left).ceil(),
-        (boxTopOne[4] * newHeight - top).ceil(),
-      );
-
-      // img.drawRect(image,
-      //     x1: box.x1,
-      //     y1: box.y1,
-      //     x2: box.x2,
-      //     y2: box.y2,
-      //     thickness: 5,
-      //     color: img.ColorInt8.rgba(0, 0, 0, 200));
-
-      return box;
-    }
-    return null;
+  void dispose() {
+    _sessionOptions.release();
+    _session.release();
+    _runOptions.release();
   }
 }
-

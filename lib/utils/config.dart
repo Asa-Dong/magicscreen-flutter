@@ -16,13 +16,16 @@ List<Task> tasks = [
   Task(
       name: "读取配置文件",
       func: (ProgressCallback callback) async {
+        await Future.delayed(Duration(seconds: 5));
         await globalState.loadConfig();
         apiBaseUrl = globalState.apiBaseUrl;
+        callback(Task.statusDone);
       }),
   Task(
       name: "拉取样式配置",
       func: (ProgressCallback callback) async {
         await globalState.fetchStyle();
+        callback(Task.statusDone);
       }),
   Task(
       name: "下载风格图片",
@@ -41,26 +44,36 @@ class Task {
   String? errorText;
   String? progressText;
 
+  DateTime? beginAt;
+  int? usedTime;
+
+
+  static final String statusDone = 'done';
+  static final String statusDoing = 'doing';
+  static final String statusError = 'error';
+
   Task({required this.name, required this.func}) {
-    status = "doing";
+    status = statusDoing;
   }
 
   Future<void> execute(ProgressCallback progressCallback) async {
-    status = "doing";
+    beginAt ??= DateTime.now();
+    status = statusDoing;
+    progressText = null;
     try {
       await func(progressCallback);
-      status = "success";
+      status = statusDone;
     } catch (e) {
       errorText = e.toString();
-      status = "error";
+      status = statusError;
     }
+    usedTime = DateTime.now().difference(beginAt!).inMilliseconds;
   }
-
 }
 
 double ss(String value) {
   if (value.endsWith('rem')) {
-    return baseRem * double.parse(value.replaceFirst('rem', ''));
+    return baseRem * screenSize.width / designWidth * double.parse(value.replaceFirst('rem', ''));
   }
   if (value.endsWith('vh')) {
     return double.parse(value.replaceFirst('vh', '')) / 100 * screenSize.height;
